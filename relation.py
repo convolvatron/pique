@@ -32,3 +32,5 @@ class Relation:
     arguments: ArgSet
     
 
+# supporting the implicit union for the moment..maybe more decorator magic
+RelationSet = Dict[str, List[Relation]]

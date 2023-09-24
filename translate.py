@@ -96,29 +96,30 @@ class Translate:
 
         inbound = {}
         outbound = {}
+        const = {}
 
-        for ind, name in enumerate(args):
-            # or constant!
-            if args[ind] in b:
-                inbound[name] = r.arguments[ind]
+        for term, target in zip(args, r.arguments):
+            if term in b:
+                inbound[term] = target
             else:
-                outbound[name] = r.arguments[ind]
+                if is_constant(term):
+                    const[target] = term
+                else:
+                    outbound[term] = target
 
         function = r.generate_signature(frozenset(inbound.values()))
         down = next(b.union(frozenset(outbound.values())))
                     
         def handler(f:Frame):
-            print("handler", rel, f, "input", inbound)
             def unpack(outf:Frame):
                 f2 = f.copy()
                 for output in outbound:
                     f2[output] = outf[outbound[output]]
                 down(f2)
 
-            input_args = {}
+            input_args = const.copy()
             for input in inbound:
                 input_args[inbound[input]] = f[input]
-            print("relation call", input_args)
             result = function(input_args, unpack)
                 
         return handler
@@ -177,6 +178,7 @@ class Translate:
         
     def expression(self, a, target:Variable, next:Construct, b:ArgSet) -> Stream:
         # why is this getting called twice?...its just the unwrap
+        print("foo", a)
         if not type(a) in self.expressions:
             self.error("no handler for", str(type(a)))
         return self.expressions[type(a)]( a, target, next, b)
@@ -223,6 +225,7 @@ class Translate:
         def each(b:ArgSet) -> Stream:
             try:
                 statement = i.__next__()
+                print("Statement", statement)                
                 return self.statement(statement, each, b)
             except StopIteration:
                 # maybe we should think about ... running this instead of just calling next?
@@ -247,9 +250,12 @@ def map_arguments(a: ast.arguments):
     
 # rule should really be a separate layer than ast translation
 class Rule(Relation):
-    
     def __init__(self, d: ast.FunctionDef, filename:str, rels:Dict[str, Relation]):
-
+        # to support multiple bodies - soft intern a relation, then make an exploder
+        # maybe something to uniquify them....like a class relationship? yeah...
+        # instead of just dumping them in a bucket and not being able to talk
+        # about them individually
+        
         # name, args, body, returns, type_comment
         def generate(b:ArgSet) -> RelationStream:
             t = Translate(filename, rels, print)

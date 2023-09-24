@@ -2,7 +2,7 @@
 
   This is a little project to build a dataflow graph from a rule set. Its exploring the thesis (present in Verse)
   that logic programming isn't really that different than functional programming, its just been obscured by
-  the syntactic conventions around datalog implementations.
+  the syntactic conventions around datalog implementations. Call pique an ergnomic experiment.
 
   So to explore this a little, we make a very basic top down streaming datalog implementation, with rules specified
   using native python syntax.
@@ -23,11 +23,26 @@
         item{functions may not return a value at all, or may return many values}
         item{argumnets can serve as inputs or outputs}
       }
+      
       section{the implicit union of multiple definitions}{
-        the standard datalog construction allows us to define a function multiple times, and the result
-        at any call site is the union of the results of all of them. this seems odd, but its really quite
-        useful if you consider that many logic programs are 'run backwards'
+        the standard datalog construction allows us to define a
+        function multiple times, and the result at any call site is
+        the union of the results of all of them. this seems odd, but
+        its really quite useful if you consider that many logic
+        programs are 'run backwards'.
+
+        we follow this model in Pique, but it would be interesting to think
+        about altneratives that hew more closely to peoples expectations. It
+        also brings up the unfortunate requirement to enforce that all implementations
+        of a given rule have matching signatures. It also makes it strange to think
+        about redefining a rule dynamically.
+
+        ok, we're going to consider an alternative, which allows us to assert()
+        a value, with semantics equivalent to having it in a rule head (since
+        everything is bidirectional anyways). this also allows us to have multiple
+        'heads' in the same body, which is an additional convenience
       }
+      
    }
     
   section{Evaluation}
@@ -37,8 +52,9 @@
         
      
   section{Python Embedding}{
-     we add and annotation to python that is intepreted by load.py. code {@rule} puts a functoin definition
-     in the rule namespace
+     we add and annotation to python that is intepreted by
+     load.py. code {@rule} puts a functoin definition in the rule
+     namespace
      
      list{
         item{rule}{a horn clause expressed as a python function def}
@@ -72,11 +88,13 @@
     bag semantics in set by replacing tuples with a code{(count, tuple)} pair.
 
     section{result sets}{
-       In logic programming, variables and rules dont denote a
-       a single value, but all possible values that satistfy the constraints. This
-       is the major operational difference, and removes alot of boilerplate and
-       fussy loop construction. However, its make it a little harder to reason
-       about and construct complicated reductions with inter-value dependencies.}}
+       In logic programming, variables and rules dont denote a a
+       single value, but all possible values that satistfy the
+       constraints. This is the major operational difference, and
+       removes alot of boilerplate and fussy loop
+       construction. However, its make it a little harder to reason
+       about and construct complicated reductions with inter-value
+       dependencies.}}
    
 
   section{Signatures}{
@@ -110,8 +128,15 @@
 
   section{Excercises for the reader}{
   
-    section{incremental}{}
+    section{incremental evalutaion}{
+      one of the really cool side effects of 
+    }
+
     
+    section{cyclic evaluation and negation}{
+    
+    }
+   
     section{reordering compiler}{
       As we mentioned, the semantics of rules allow us to evaluate each of the statements in any order.
       Some orderings are quite a bit more efficient than others. For example a join between two relations
