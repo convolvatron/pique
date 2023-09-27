@@ -32,12 +32,11 @@ class Translate:
     filename: str
     # typing around *args is .. what?
     error: Callable[[str], None]
-    relations: Dict[str, Relation]
 
-    def __init__(self, filename, relations, error):
+    def __init__(self, filename, scope, error):
         self.filename = filename
-        self.relations = relations
         self.error = error
+        self.scope = scope
         
         # doesn't need to be dynamic ... it does, these references are closures over self
         self.statements = {ast.Assign:self.assign,
@@ -87,7 +86,7 @@ class Translate:
     # ok, we dont really need to dynamize this, we've already deferred signature
     # generation until the query, so we think that it all should be bound
     def relation_out(self, rel:str, b:ArgSet, next:Construct, args:List[Variable]) -> Stream:
-        if rel not in self.relations:
+        if rel not in self.scope:
             self.error("no such relation", rel);
         r = self.relations[rel]
             
@@ -249,8 +248,9 @@ def map_arguments(a: ast.arguments):
     return result
     
 # rule should really be a separate layer than ast translation
+# we originally passed around our own namespace - and decided to use pythons
 class Rule(Relation):
-    def __init__(self, d: ast.FunctionDef, filename:str, rels:Dict[str, Relation]):
+    def __init__(self, d: ast.FunctionDef, filename:str):
         # to support multiple bodies - soft intern a relation, then make an exploder
         # maybe something to uniquify them....like a class relationship? yeah...
         # instead of just dumping them in a bucket and not being able to talk
@@ -258,8 +258,6 @@ class Rule(Relation):
         
         # name, args, body, returns, type_comment
         def generate(b:ArgSet) -> RelationStream:
-            t = Translate(filename, rels, print)
+            t = Translate(filename, print)
             return t.generate(d.body, b)
 
-        # doesn't really handle dynamic changes to the dependencies
-        super().__init__(map_arguments(d.args), signature_cache(lambda b: generate(b)))

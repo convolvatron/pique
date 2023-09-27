@@ -12,7 +12,6 @@ from typing import *
 # no deletion!
 
 class Facts(Relation):
-
     # frames should really be lists not dicts
     def index_key(self, keys:ArgSet, f:Frame) -> Tuple:
         lookup = []

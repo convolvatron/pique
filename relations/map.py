@@ -17,9 +17,10 @@ def map_lookup(map, key) -> Any:
 # I guess we could write a loader for this
 # and an annotation
 
-relation = Relation(
-    fixed_handlers(({'map'}, map_iterate),
-                   ({'map', 'key'}, map_lookup),
-                   ({'map', 'key', 'value'}, map_check)),
-    ['map', 'key', 'value'])
+class Map(Relation):
+    arguments = ['map', 'key', 'value']
+
+#    fixed_handlers(({'map'}, map_iterate),
+#                   ({'map', 'key'}, map_lookup),
+#                   ({'map', 'key', 'value'}, map_check)),
     

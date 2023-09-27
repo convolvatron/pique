@@ -25,12 +25,8 @@ def signature_cache(create: Callable[[ArgSet], Stream]) -> Callable[[ArgSet], Re
     return lookup
 
 class Relation:
-    def __init__(self, arguments:List[str], generate: Callable[[ArgSet], RelationStream]):
-        self.generate_signature = generate
-        self.arguments = arguments
-    generate_signature: Callable[[ArgSet], RelationStream]
-    arguments: ArgSet
-    
+    arguments:List[Variable]
+    signature: Callable[[ArgSet], RelationStream]    
 
 # supporting the implicit union for the moment..maybe more decorator magic
 RelationSet = Dict[str, List[Relation]]
