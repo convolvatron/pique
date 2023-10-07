@@ -3,8 +3,11 @@
 def grandparent(grandparent, grandchild):
     parent(parent, grandchild)
     parent(grandparent, parent)
-
-class parent(Facts):
+    
+class zeg:
+    pass
+    
+class parent:
     arguments = ['parent', 'child']
     facts = [
         ("joe", "nancy"),

@@ -1,7 +1,6 @@
 from typing import *
 from relation import *
 import ast
-import itertools
 
 # normally I would put in a translation step to a well-defined intermediate, but since
 # this is supposed to be short and sweet, we just do a direct translation to closures
@@ -17,7 +16,7 @@ import itertools
 # we use two tools to maek this easier. generate and subexpressions
 
 
-Construct = Callable[[ArgSet], Stream]
+
 # really a union type of all the GTS nodes
 Ast = Any
 
@@ -82,182 +81,109 @@ class Translate:
             ast.BitAnd: "bitand",
             ast.MatMult: "matmult",
     }
-
-    # ok, we dont really need to dynamize this, we've already deferred signature
-    # generation until the query, so we think that it all should be bound
-    def relation_out(self, rel:str, b:ArgSet, next:Construct, args:List[Variable]) -> Stream:
-        if rel not in self.scope:
-            self.error("no such relation", rel);
-        r = self.relations[rel]
-            
-        if len(args) != len(r.arguments):
-            self.error("arity mismatch")
-
-        inbound = {}
-        outbound = {}
-        const = {}
-
-        for term, target in zip(args, r.arguments):
-            if term in b:
-                inbound[term] = target
-            else:
-                if is_constant(term):
-                    const[target] = term
-                else:
-                    outbound[term] = target
-
-        function = r.generate_signature(frozenset(inbound.values()))
-        down = next(b.union(frozenset(outbound.values())))
-                    
-        def handler(f:Frame):
-            def unpack(outf:Frame):
-                f2 = f.copy()
-                for output in outbound:
-                    f2[output] = outf[outbound[output]]
-                down(f2)
-
-            input_args = const.copy()
-            for input in inbound:
-                input_args[inbound[input]] = f[input]
-            result = function(input_args, unpack)
                 
-        return handler
-                
-
+    def clause(self, rel:str, args:List[Variable]) -> Clause:
+        k = args.copy()
+        k.insert(0, rel)
+        print("clause", k)
+        return k
+    
     # ok, we need to handle the tuple-on-the-left unpacking case
     # targets is a list of assigned values, if we were translating into
     # frames that would give us the equivalence classes we need to express that easily
-    def assign(self, a: ast.Assign, next:Construct, b:ArgSet) -> Stream:
+    def assign(self, a: ast.Assign) -> List[Clause]:
         if len(a.targets) != 1:
             self.error("unhandled assignment arity", str(len(a.targets)))
-        # iterate over targets
-        # we need to make these equivalent
-        def finish(b:ArgSet, terms:List[Variable]):
-            next()
-        
-        return self.subexpressions([a.targets[0], a.value], b, finish)
+        (cls, vs) = self.subexpressions([a.targets[0], a.value])
+        cls.append(self.clause("equals", vs))
+        return cls
 
    
-    def slice(self, s:ast.Slice, target:Variable, next:Construct, b:ArgSet) -> Stream:
+    def slice(self, s:ast.Slice, target:Variable) -> List[Clause]:
         pass
     
-    def unwrap_expr(self, e:ast.Expr, target:Variable, next:Construct, b:ArgSet) -> Stream:
-        return self.expression(e.value, target, next, b)
+    def unwrap_expr(self, e:ast.Expr, target:Variable) -> List[Clause]:
+        return self.expression(e.value, target)
 
     # it would be nicer here if the target assigned the name
-    def constant(self, c:ast.Constant, target:Variable, next:Construct, b:ArgSet) -> Stream:
+    def constant(self, c:ast.Constant, target:Variable) -> List[Clause]:
         return self.relation_out("equals", b, next, (target, c.value))
 
-    def subexpressions(self, a:List[Ast], b:ArgSet, next:Callable[[ArgSet, List[Variable]], Stream]) -> Stream:
-        terms = []
-        i = a.__iter__()
-        def each(b:ArgSet) -> Stream:
-            try:
-                exp = i.__next__()
-                if isinstance(exp, ast.Name):
-                    terms.append(exp.id)
-                    return each(b)
-                else:
-                    # self.temp(exp) location
-                    v = "temp"
-                    return self.expression(exp, v, each, b)                
-            except StopIteration:
-                return next(b, terms)
-        s = each(b)
-        return s
+    def subexpressions(self, a:List[Ast]) -> (List[Clause], List[Variable]):
+        c = []        
+        v = []
+        print("subexpressions", a)
+        for i in a:
+            print ("subr", i)
+            if isinstance(i, ast.Name):
+                v.append(i.id)
+            else:
+                v.append("temp")
+                c.append(self.expression(i, v))
+        print ("subrf", c, v)
+        return (c, v)
     
-
-    def binary(self, a:ast.BinOp, target:Variable, next:Construct, b:ArgSet) -> Stream:
+    def binary(self, a:ast.BinOp, target:Variable) -> List[Clause]:
         if type(a.op) not in  self.binops:
             self.error("unsupported binop", a.op)
         op =  self.binops[type(a.op)]
-        def tail(b:ArgSet, v:List[Variable]) ->Stream:
-            return self.relation_out(op, b, next, v[1:])        
-        return self.subexpressions([a.left, a.right], b, tail)
+        (prefix, vars) = self.subexpressions([a.left, a.right], b, tail)        
+        return prefix.apppend(clause(op, vars))
         
-    def expression(self, a, target:Variable, next:Construct, b:ArgSet) -> Stream:
-        # why is this getting called twice?...its just the unwrap
-        print("foo", a)
+    def expression(self, a, target:Variable) -> List[Clause]:
+        print ("expressiony", a)
         if not type(a) in self.expressions:
+            panic("foo", type(a))
             self.error("no handler for", str(type(a)))
-        return self.expressions[type(a)]( a, target, next, b)
+        print("exp", a, self.expressions[type(a)])
+        return self.expressions[type(a)]( a, target)
         
     # we're not goign to deal with varargs or kwargs right now
-    def call(self, c:ast.Call, target:Variable, next:Construct, b:ArgSet) -> Stream:
-        def tail(b:ArgSet, v:List[Variable]) ->Stream:
-            return self.relation_out(v[0], b, next, v[1:])
+    def call(self, c:ast.Call, target:Variable) -> List[Clause]:
+        # why cant i inline this construction?
         z = c.args.copy()
         z.insert(0, c.func)
-        return self.subexpressions(z, b, tail)
+        (prefix, vars) = self.subexpressions(z)
+        c = self.clause(vars[0], vars[1:])
+        prefix.append(c)
+        return prefix
     
-    def compare(self, c:ast.Compare, target:Variable, next:Construct, b:ArgSet) -> Stream:
+    def compare(self, c:ast.Compare, target:Variable) -> List[Clause]:
         if len(c.comparators) > 1 or len(c.ops) > 1:
             self.error("compound comparator")
-        print ("compare", self.comparators[type(c.ops[0])])
         j = c.comparators.copy()
         j.insert(0, c.left)
-        def tail(b:ArgSet, t:List[Variable]) -> Stream:
-            return next(b)
-        return self.subexpressions(j, b, tail)
+        (prefix, vars) = self.subexpressions(j, b, tail)
+        return prefix
             
-    def attribute(self, a:ast.Attribute, target:Variable, next:Construct, b:ArgSet) -> Stream:
+    def attribute(self, a:ast.Attribute, target:Variable) -> List[Clause]:
         # a.ctx  ∈ {Load, Store, Del }        
-        def tail(b:ArgSet, terms:List[Variable]):
-            return self.relation_out("map", b, next, terms)
+        (prefix, vars) = self.subexpressions([a.value, a.attr])
+        prefix.append(self.relation_out("map", terms))
 
-        return self.subexpressions([a.value, a.attr], b, tail)            
-
-    def if_to_clause(self, i:ast.IfExp, next:Construct, b:ArgSet) -> Stream:
+    def if_to_clause(self, i:ast.IfExp) -> List[Clause]:
         # i.orelse
-        print("if", self.expression(i.test, cond, b), self.body_to_clause(i.body, b, next))
+        print("if", self.expression(i.test, cond), self.body_to_clause(i.body))
 
-    def statement(self, a, next:Construct, b:ArgSet) -> Stream:
+    def statement(self, a) -> List[Clause]:
         if type(a) in self.statements:
             print("statement ", type(a))
-            return self.statements[type(a)](a, next, b)            
-        return self.expression(a, '_', next, b)
+            return self.statements[type(a)](a)
+        # terminus variable
+        return self.expression(a, '_')
 
     # why doesnt this take a generator next
     # defer translation until runtime to allow for dynamic and late binding
-    def body_to_clause(self, body, b:ArgSet, next:Construct) -> Stream:
-        i = body.__iter__()
-        def each(b:ArgSet) -> Stream:
-            try:
-                statement = i.__next__()
-                print("Statement", statement)                
-                return self.statement(statement, each, b)
-            except StopIteration:
-                # maybe we should think about ... running this instead of just calling next?
-                return next(b)
-        return each(b)
+    # ok, we dont care about b here...that changes _everything_
+    def body_to_clauses(self, body) -> List[Clause]:
+        result = []
+        for i in body:
+            print("top", i)
+            n = self.statement(i)
+            print ("bubby", i, n)
+            result += n
+        return result
 
 
-    def generate(self, body, b:ArgSet) -> RelationStream:
-        def head(f:Frame, cont:Stream) -> Stream:
-            print("rule head dynamic", f, type(b))
-            h = self.body_to_clause( body, b, lambda b:cont)
-            h(f)
-        return head
 
-
-# why is posonlyargs here if it seems to be empty when all i have is positional?
-def map_arguments(a: ast.arguments):
-    result = []
-    for i in a.args:
-        result.append(i.arg)
-    return result
-    
-# rule should really be a separate layer than ast translation
-# we originally passed around our own namespace - and decided to use pythons
-class Rule(Relation):
-    def __init__(self, d: ast.FunctionDef, filename:str):
-        # to support multiple bodies - soft intern a relation, then make an exploder
-        # maybe something to uniquify them....like a class relationship? yeah...
-        # instead of just dumping them in a bucket and not being able to talk
-        # about them individually
-        
-        # name, args, body, returns, type_comment
-        def generate(b:ArgSet) -> RelationStream:
-            t = Translate(filename, print)
-            return t.generate(d.body, b)
 

@@ -6,16 +6,15 @@ from relation import *
 Construct = Callable[[ArgSet], List[Clause]]
 
 class Rule(Relation):
-    # what about heads?
-    def __init__(self, args, body: List[Clauses], scope):
+    # what about heads? metadata?
+    def __init__(self, args, body: List[Clause], scope):
         # to support multiple bodies - soft intern a relation, then make an exploder
         # maybe something to uniquify them....like a class relationship? yeah...
         # instead of just dumping them in a bucket and not being able to talk
         # about them individually
         self.body = body
         self.scope = scope
-        self.filename = filename
-
+        self.error = lambda *x :print("errorz", *x)
 
     # ok, we dont really need to dynamize this, we've already deferred signature
     # generation until the query, so we think that it all should be bound
@@ -24,7 +23,7 @@ class Rule(Relation):
     def relation_out(self, rel:str, b:ArgSet, next:Construct, args:List[Variable]) -> Stream:
         if rel not in self.scope:
             self.error("no such relation", rel);
-        r = self.relations[rel]
+        r = self.scope[rel]
             
         if len(args) != len(r.arguments):
             self.error("arity mismatch")
@@ -59,10 +58,6 @@ class Rule(Relation):
                 
         return handler
         
-    # name, args, body, returns, type_comment
-    def generate_signature(self, b:ArgSet) -> RelationStream:
-        t = Translate(self.filename, sel.scope, print)
-        return t.generate(self.body, b)
 
     def clauses_to_stream(self, body:List[Clause], b:ArgSet, next:Construct) -> Stream:
         i = body.__iter__()
@@ -70,8 +65,17 @@ class Rule(Relation):
             try:
                 statement = i.__next__()
                 print("Statement", statement)                
-                return self.statement(statement, each, b)
+                return self.relation_out(statement[0], each, b, statement[1:])
             except StopIteration:
-                # maybe we should think about ... running this instead of just calling next?
                 return next(b)
         return each(b)
+    
+    # how to get the dynamic next to the tail? we're shoving it in the frame. with a stack
+    # to support nesting. not pretty
+    def generate_signature(self, b:ArgSet) -> RelationStream:
+        s = self.clauses_to_stream(self.body, b, lambda b: lambda f: f["__next_stack__"].pop()(f))
+        def head(f, n):
+            f["__next_stack__"].push(n)
+            s(f)
+            return head
+

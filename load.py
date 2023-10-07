@@ -9,6 +9,7 @@ from relation import *
 import relations.map
 import relations.filesystem
 import relations.facts
+import relations.rule
 
 def error(*args):
     print(*args)
@@ -17,6 +18,12 @@ def error(*args):
 def is_rule(f: ast.FunctionDef) -> bool:
     for d in f.decorator_list:
         if d.id == "rule":
+            return True
+    return False
+
+def is_facts(f: ast.ClassDef) -> bool:
+    for b in f.bases:
+        if b.id == "Facts":
             return True
     return False
 
@@ -30,6 +37,7 @@ def load_facts(c:Type):
         f.insert(i.elts)
     print("end facts")
 
+
 def translate_file(filename, text):
     mod = ast.parse(text, filename=sys.argv[1], mode='exec', type_comments=False)
     # there is an oicial way to get module.__dict__?
@@ -39,37 +47,37 @@ def translate_file(filename, text):
         print("stmt", i)
         
         if isinstance(i, ast.FunctionDef) and is_rule(i):
-            # tuck this in the namespace
-            mod.__dict__[i.name] = translate.Rule(i, filename)            
-            continue
-
-        if isinstance (i, ast.Import):
-            print("import", i.names)
-            for a in i.names:
-                print("import", a.name, a.asname)
+            r = t.body_to_clauses(i.body)
+            # should carry metadata too
+            print(r)
+            mod.__dict__[i.name] = relations.rule.Rule(i.args, r, mod.__dict__)
             continue
         
         filtered.append(i)
 
-    # ok! we can manipulate mod.__dict__
-    print("mod dict", mod.__dict__)
+        #    qp = ast.parse(_query_text, filename, mode='exec')
+        #    filtered.append(qp.body[0])
     mod.body = filtered
     qm = compile(mod, filename, "exec")
-    
-    for i in relations.facts.Facts.__subclasses__():
-        load_facts(i)
-    
+
+    local = mod.__dict__
     def query(relname, frame, handler):
-        if relname not in mod.__dict__:
+        # dot syntax
+        if relname not in local:
             error("no relation", relname)
-        rel = mod.__dict__[relname]
+        rel = local[relname]
         s = rel.generate_signature(frozenset(frame.keys()))
         print ("exec", s)
         s(frame, print)
-
-    # i dont know why...I insist on making Facts implcitly included..so think about that 
-    exec(qm, {"query":query, "Facts":relations.facts.Facts})
+     
+    # i dont know why...I insist on making Facts implcitly included..so think about that
+    local["Facts"] = relations.facts.Facts
+    local["query"] = query
+    exec(qm, local)
         
 if __name__ == "__main__":
     text = pathlib.Path(sys.argv[1]).read_text()
+    # this is..quite sad, but trying to get this stapled on at the ast level
+    # violates some fussy namespace construction in ast.parse. the parse/compile/exec
+    # boundry is pretty poorly defined
     translate_file(sys.argv[1], text)
