@@ -32,6 +32,7 @@ class Rule(Relation):
         outbound = {}
         const = {}
 
+        print ("args", args, r.arguments, b, r)
         for term, target in zip(args, r.arguments):
             if term in b:
                 inbound[term] = target
@@ -62,10 +63,11 @@ class Rule(Relation):
     def clauses_to_stream(self, body:List[Clause], b:ArgSet, next:Construct) -> Stream:
         i = body.__iter__()
         def each(b:ArgSet) -> Stream:
+            print("each", b)
             try:
                 statement = i.__next__()
-                print("Statement", statement)                
-                return self.relation_out(statement[0], each, b, statement[1:])
+                print("Statement", statement, b)                
+                return self.relation_out(statement[0], b, each, statement[1:])
             except StopIteration:
                 return next(b)
         return each(b)

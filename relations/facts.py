@@ -49,6 +49,9 @@ class Facts(Relation):
             self.indices[keys] = lookup
         return self.indices[keys]
 
+    def generate_signature(self, b:ArgSet) ->RelationStream:
+        print("strippy", b)
+        
     #positional, so we're translating from frame..fix
     #incremental with subscriptions:)    
     def insert(self, terms):
@@ -60,12 +63,10 @@ class Facts(Relation):
         for k, v in self.indices:
             self.index_insert(k, v, named)
         
-    def __init__(self, args):
+    def __init__(self, args, facts):
         # base is a list of all the tuples in this relation, which is redundant
-        self.base=[]
+        self.base=facts
         self.indices = {}
-        super().__init__(args, signature_cache(self.build_index))
-        
 
     
     

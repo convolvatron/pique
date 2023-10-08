@@ -23,6 +23,9 @@ RelationStream = Callable[[Frame, 'Stream'], None]
 #should we add the constraint that the relation slot be a constant?
 Clause = List[Term]
 
+def is_constant(a) -> bool:
+    return isinstance(a, int) or isinstance(a, str)
+
 # args is a list of (frozen(ArgSet), Stream) pairs
 def fixed_handlers(*args):
     return {frozenset(('k', 1))}
@@ -37,6 +40,7 @@ def signature_cache(create: Callable[[ArgSet], Stream]) -> Callable[[ArgSet], Re
         return cache[a]
     return lookup
 
+# i guess this is .. abstract?
 class Relation:
     arguments:List[Variable]
     signature: Callable[[ArgSet], RelationStream]    

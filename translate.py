@@ -24,9 +24,6 @@ def format_ast_location(file, a):
     pass
 # lineno and col_offset
 
-def is_constant(a) -> bool:
-    return isinstance(a, int)
-    
 class Translate:
     filename: str
     # typing around *args is .. what?
