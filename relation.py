@@ -30,20 +30,16 @@ def is_constant(a) -> bool:
 def fixed_handlers(*args):
     return {frozenset(('k', 1))}
 
-# this doesn't handle cycles in ungenerated relation references - its just keeps trying to build them
-def signature_cache(create: Callable[[ArgSet], Stream]) -> Callable[[ArgSet], RelationStream]:
-    cache: Dict[ArgSet, Stream] = {}            
-    # are ArgSet always in order? does set comparison work properly if they aren't? i guess so     
-    def lookup(a :ArgSet):
-        if a not in cache:
-            cache[a] = create(a)
-        return cache[a]
-    return lookup
-
-# i guess this is .. abstract?
 class Relation:
     arguments:List[Variable]
-    signature: Callable[[ArgSet], RelationStream]    
+    
+    def signature(self, b :ArgSet) -> RelationStream:
+        if b not in self.cache:
+            self.cache[b] = self.build(b)
+        return self.cache[b]
+
+    def __init__(self):
+        self.cache :Dict[ArgSet, Stream] = {}            
 
 # supporting the implicit union for the moment..maybe more decorator magic
 RelationSet = Dict[str, List[Relation]]

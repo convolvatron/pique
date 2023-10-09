@@ -15,6 +15,7 @@ class Rule(Relation):
         self.body = body
         self.scope = scope
         self.error = lambda *x :print("errorz", *x)
+        super().__init__()
 
     # ok, we dont really need to dynamize this, we've already deferred signature
     # generation until the query, so we think that it all should be bound
@@ -42,22 +43,24 @@ class Rule(Relation):
                 else:
                     outbound[term] = target
 
-        function = r.generate_signature(frozenset(inbound.values()))
+        function = r.signature(frozenset(inbound.values()))
         down = next(b.union(frozenset(outbound.values())))
                     
-        def handler(f:Frame):
-            def unpack(outf:Frame):
+        def inh(f:Frame):
+            save = f["__next__"]
+            def outh(outf:Frame):
                 f2 = f.copy()
                 for output in outbound:
                     f2[output] = outf[outbound[output]]
+                f2["__next__"] = save                    
                 down(f2)
 
             input_args = const.copy()
             for input in inbound:
                 input_args[inbound[input]] = f[input]
-            result = function(input_args, unpack)
+            result = function(input_args, outh)
                 
-        return handler
+        return inh
         
 
     def clauses_to_stream(self, body:List[Clause], b:ArgSet, next:Construct) -> Stream:
@@ -74,10 +77,10 @@ class Rule(Relation):
     
     # how to get the dynamic next to the tail? we're shoving it in the frame. with a stack
     # to support nesting. not pretty
-    def generate_signature(self, b:ArgSet) -> RelationStream:
-        s = self.clauses_to_stream(self.body, b, lambda b: lambda f: f["__next_stack__"].pop()(f))
+    def build(self, b:ArgSet) -> RelationStream:
+        s = self.clauses_to_stream(self.body, b, lambda b: lambda f: f["__next__"](f))
         def head(f, n):
-            f["__next_stack__"].push(n)
+            f["__next__"] = n 
             s(f)
-            return head
+        return head
 

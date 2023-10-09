@@ -66,7 +66,7 @@ def translate_file(filename, text):
         if relname not in local:
             error("no relation", relname)
         rel = local[relname]
-        s = rel.generate_signature(frozenset(frame.keys()))
+        s = rel.signature(frozenset(frame.keys()))
         print ("exec", s)
         s(frame, print)
      
