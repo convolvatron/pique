@@ -47,6 +47,7 @@ class Rule(Relation):
         down = next(b.union(frozenset(outbound.values())))
                     
         def inh(f:Frame):
+            print("rel call", f)
             save = f["__next__"]
             def outh(outf:Frame):
                 f2 = f.copy()

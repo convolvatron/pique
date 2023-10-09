@@ -13,13 +13,13 @@ from typing import *
 
 class Facts(Relation):
     # frames should really be lists not dicts
-    def index_key(self, keys:ArgSet, t) -> Tuple:
+    def index_key(self, keys:ArgSet, f:Frame) -> Tuple:
         lookup = []
         # we use this construction in order to following the ordering in arguments
         # we certainly cant use a set of values
-        for i, j in enumerate(self.arguments):
+        for i in self.arguments:
             if i in keys:
-                lookup.append(t[j])
+                lookup.append(f[i])
         return tuple(lookup)
 
     def index_insert(self, keys, body, f:Frame):
@@ -41,7 +41,6 @@ class Facts(Relation):
                 
             def lookup(f:Frame, next:Stream):
                 print("lookup", keys, f)
-                # could lift the map of keys to indices out of the loop
                 k = self.index_key(f.keys(), f)
                 if k in ind:
                     for i in ind[k]:
@@ -64,10 +63,17 @@ class Facts(Relation):
         for k, v in self.indices:
             self.index_insert(k, v, named)
         
-    def __init__(self, args, facts):
+    def __init__(self, arguments, facts):
         # base is a list of all the tuples in this relation, which is redundant
-        self.base=facts
-        self.arguments = args
+        base = []
+        # translate to kv
+        for i in facts:
+            term = {}
+            for ind, a in enumerate(arguments):
+                term[a] = i[ind]
+            base.append(term)
+        self.base=base
+        self.arguments = arguments
         self.indices = {}
         super().__init__()
 
