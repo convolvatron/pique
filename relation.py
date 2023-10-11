@@ -1,9 +1,15 @@
 from typing import *
+from dataclasses import dataclass
 
+@dataclass(frozen=True)
 class Variable:
     name :str
-    def __init__(self, name):
-        self.name = name
+        
+    def __hash__(self):
+        return self.name.__hash__()
+    
+    def __eq__(self, a):
+        return self.name == a
     
 
 Frame = Dict[str, Any]

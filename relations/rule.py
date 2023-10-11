@@ -33,8 +33,8 @@ class Rule(Relation):
         outbound = {}
         const = {}
 
-        print ("args", args, r.arguments, b, r)
         for term, target in zip(args, r.arguments):
+            print("checko", term, target, is_constant(term))
             if term in b:
                 inbound[term] = target
             else:
@@ -43,11 +43,12 @@ class Rule(Relation):
                 else:
                     outbound[term] = target
 
+        print("relation down", args, r.arguments, b, "->", inbound, outbound)                    
         function = r.signature(frozenset(inbound.values()))
         down = next(b.union(frozenset(outbound.values())))
-                    
+
+        
         def inh(f:Frame):
-            print("rel call", f)
             save = f["__next__"]
             def outh(outf:Frame):
                 f2 = f.copy()
@@ -60,17 +61,15 @@ class Rule(Relation):
             for input in inbound:
                 input_args[inbound[input]] = f[input]
             result = function(input_args, outh)
-                
         return inh
         
-
     def clauses_to_stream(self, body:List[Clause], b:ArgSet, next:Construct) -> Stream:
         i = body.__iter__()
         def each(b:ArgSet) -> Stream:
-            print("each", b)
             try:
                 statement = i.__next__()
-                print("Statement", statement, b)                
+                print ("clause", b, statement)
+                # didn't augment the binding
                 return self.relation_out(statement[0], b, each, statement[1:])
             except StopIteration:
                 return next(b)

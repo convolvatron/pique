@@ -26,7 +26,6 @@ class Facts(Relation):
         key = self.index_key(keys, f)
         if key not in body:
             body[key] = []
-        print("index insert", key, f)
         body[key].append(f)
 
     # blowing out all indices ever required is a dismal policy. additional

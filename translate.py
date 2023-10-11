@@ -13,7 +13,7 @@ import ast
 
 # relation invocations take a runtime continuation (next)
 
-# we use two tools to maek this easier. generate and subexpressions
+# we use two tools to make this easier. clause and subexpressions
 
 
 
@@ -82,7 +82,6 @@ class Translate:
     def clause(self, rel:str, args:List[Variable]) -> Clause:
         k = args.copy()
         k.insert(0, rel)
-        print("clause", k)
         return k
     
     # ok, we need to handle the tuple-on-the-left unpacking case
@@ -109,15 +108,12 @@ class Translate:
     def subexpressions(self, a:List[Ast]) -> (List[Clause], List[Variable]):
         c = []        
         v = []
-        print("subexpressions", a)
         for i in a:
-            print ("subr", i)
             if isinstance(i, ast.Name):
-                v.append(i.id)
+                v.append(Variable(i.id))
             else:
                 v.append("temp")
                 c.append(self.expression(i, v))
-        print ("subrf", c, v)
         return (c, v)
     
     def binary(self, a:ast.BinOp, target:Variable) -> List[Clause]:
@@ -128,11 +124,9 @@ class Translate:
         return prefix.apppend(clause(op, vars))
         
     def expression(self, a, target:Variable) -> List[Clause]:
-        print ("expressiony", a)
         if not type(a) in self.expressions:
             panic("foo", type(a))
             self.error("no handler for", str(type(a)))
-        print("exp", a, self.expressions[type(a)])
         return self.expressions[type(a)]( a, target)
         
     # we're not goign to deal with varargs or kwargs right now
@@ -164,7 +158,6 @@ class Translate:
 
     def statement(self, a) -> List[Clause]:
         if type(a) in self.statements:
-            print("statement ", type(a))
             return self.statements[type(a)](a)
         # terminus variable
         return self.expression(a, '_')
@@ -175,12 +168,6 @@ class Translate:
     def body_to_clauses(self, body) -> List[Clause]:
         result = []
         for i in body:
-            print("top", i)
             n = self.statement(i)
-            print ("bubby", i, n)
             result += n
         return result
-
-
-
-
