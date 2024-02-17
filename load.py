@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3
+#!python3
 
 import ast
 import sys
@@ -44,13 +44,16 @@ def translate_file(filename, text):
     t = translate.Translate(sys.argv[1], mod.__dict__, error)
     filtered = []
     for i in mod.body:
-        print("stmt", i)
-        
         if isinstance(i, ast.FunctionDef) and is_rule(i):
-            r = t.body_to_clauses(i.body)
+            # move to translate
+            clauses = t.body_to_clauses(i.body)
             # should carry metadata too
-            print(r)
-            mod.__dict__[i.name] = relations.rule.Rule(i.args, r, mod.__dict__)
+            print(clauses)
+            names = map(lambda a: a.arg, i.args.args)
+            print("args", names)
+            mod.__dict__[i.name] = relations.rule.Rule(translate.listmap(names),
+                                                       clauses,
+                                                       mod.__dict__)
             continue
         
         filtered.append(i)
@@ -61,12 +64,13 @@ def translate_file(filename, text):
     qm = compile(mod, filename, "exec")
 
     local = mod.__dict__
-    def query(relname, frame, handler):
+    def query(relname, locals, handler):
         # dot syntax
         if relname not in local:
             error("no relation", relname)
         rel = local[relname]
-        s = rel.signature(frozenset(frame.keys()))
+        frame = {"locals":locals, "next":handler, "flush":True}
+        s = rel.signature(frozenset(locals.keys()))
         print ("exec", s)
         s(frame, print)
      

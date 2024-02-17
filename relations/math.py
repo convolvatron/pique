@@ -6,11 +6,11 @@ from relation import *
 def add_check(f:Frame) -> Iterable[None]:
     pass
 
-def add(a, b) -> Iterable[int]:
+# how to describe the top of the numeric tower?
+def add(a, b):
     return (a + b)
 
-relation = Relation([0, 1],
-                    fixed_handlers(({'value', 0, 1}, add_check),
-                                   ({0, 1},          add)))
+relation = Simple(fixed_handlers(({'value', 0, 1}, add_check),
+                                 ({0, 1},          add)))
 
 

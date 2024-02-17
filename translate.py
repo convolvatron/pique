@@ -16,7 +16,12 @@ import ast
 # we use two tools to make this easier. clause and subexpressions
 
 
-
+def listmap(a):
+    result = {}
+    for i, j in enumerate(a):
+        result[i] = j
+    return result
+    
 # really a union type of all the GTS nodes
 Ast = Any
 
@@ -80,9 +85,7 @@ class Translate:
     }
                 
     def clause(self, rel:str, args:List[Variable]) -> Clause:
-        k = args.copy()
-        k.insert(0, rel)
-        return k
+        return (Variable(rel), args.copy())
     
     # ok, we need to handle the tuple-on-the-left unpacking case
     # targets is a list of assigned values, if we were translating into
@@ -124,18 +127,18 @@ class Translate:
         return prefix.apppend(clause(op, vars))
         
     def expression(self, a, target:Variable) -> List[Clause]:
+        print("expression", a)
         if not type(a) in self.expressions:
             panic("foo", type(a))
             self.error("no handler for", str(type(a)))
         return self.expressions[type(a)]( a, target)
         
-    # we're not goign to deal with varargs or kwargs right now
     def call(self, c:ast.Call, target:Variable) -> List[Clause]:
-        # why cant i inline this construction?
-        z = c.args.copy()
-        z.insert(0, c.func)
-        (prefix, vars) = self.subexpressions(z)
-        c = self.clause(vars[0], vars[1:])
+        (prefix, vars) = self.subexpressions(c.args)
+        z = listmap(vars)
+        # xxx - free or derived rel
+        print("call", c.func.id)
+        c = self.clause(c.func.id, z)
         prefix.append(c)
         return prefix
     
@@ -162,9 +165,6 @@ class Translate:
         # terminus variable
         return self.expression(a, '_')
 
-    # why doesnt this take a generator next
-    # defer translation until runtime to allow for dynamic and late binding
-    # ok, we dont care about b here...that changes _everything_
     def body_to_clauses(self, body) -> List[Clause]:
         result = []
         for i in body:

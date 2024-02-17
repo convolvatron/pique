@@ -10,7 +10,9 @@ from typing import *
 # remove the redundant columns
 
 # no deletion!
+# we should be able to use a raw dict a relation also (hor!)
 
+            
 class Facts(Relation):
     # frames should really be lists not dicts
     def index_key(self, keys:ArgSet, f:Frame) -> Tuple:
@@ -31,24 +33,27 @@ class Facts(Relation):
     # blowing out all indices ever required is a dismal policy. additional
     # insert overhead and footprint need to be balanced against usage and
     # cardinality
-    def build(self, keys:ArgSet) -> RelationStream:
+    def build(self, keys:ArgSet) -> Stream:
         if keys not in self.indices:
             print ("buildindex", keys)
             ind : Dict[ArgSet, List[Tuple]]= {}
             for i in self.base:
                 self.index_insert(keys, ind, i)
                 
-            def lookup(f:Frame, next:Stream):
-                print("lookup", keys, f)
-                k = self.index_key(f.keys(), f)
+            def lookup(f:Frame):
+                print("lookup", keys)
+                k = self.index_key(f["locals"].keys(), f)
                 if k in ind:
                     for i in ind[k]:
-                        next(i)
+                        # i guess an output frame is a different 'type' here
+                        # but we kind need to copy keys - maybe we should just overwrite locals?
+                        # only flush on the last guy!
+                        f["next"]({"locals":i, "parent":f["parent"], "flush":"flush" in f})
                     
             self.indices[keys] = lookup
         return self.indices[keys]
 
-    def generate_signature(self, b:ArgSet) ->RelationStream:
+    def generate_signature(self, b:ArgSet) ->Stream:
         print("strippy", b)
         
     #positional, so we're translating from frame..fix

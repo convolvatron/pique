@@ -1,8 +1,8 @@
 all:
-	./load.py examples/grandparents.py
+	python3 ./load.py examples/grandparents.py
 
 make:
-	./load.py examples/make.py
+	python3 ./load.py examples/make.py
 
 check:
 	mypy load.py

@@ -13,33 +13,37 @@ class Variable:
     
 
 Frame = Dict[str, Any]
-# or constant! - we have the same issue we've had before, variable vs constant string, but
-# there is at least a syntactic distinciton
-Referent = Union[str, int, Variable]
-Term = List[Referent]
-ArgSet = FrozenSet[Variable]
-# this is apparently the model for defining recursive types, using the namespace for the back edge(?)
-# I would like this to be in translate, but relation.generate_signature uses it
-Stream = Callable[[Frame], None]
-
-# relation entry points take a dynamic next so we can share them between call sites
-RelationStream = Callable[[Frame, 'Stream'], None]
-
-#clause is a one element of a horn clause conjunction...sorry
-#should we add the constraint that the relation slot be a constant?
-Clause = List[Term]
+Name = str
+Constant  = Union[int, str]
+# not str?
+Argument = Union[Variable, Constant]
+Term = List[Argument]
+ArgSet = FrozenSet[Union[int, Name]]
+Stream = Callable[[Frame, OutStream], None]
+OutStream = Callable[[Frame], None]
+Clause = Tuple[Argument, Dict[Variable, Argument]]
+GeneratorResult = Union[Stream, None]
+Genenrator = Callable[[Argset], GeneratorResult]
 
 def is_constant(a) -> bool:
-    return isinstance(a, int) or isinstance(a, str)
+    return isinstance(a, get_args(Constant))
 
-# args is a list of (frozen(ArgSet), Stream) pairs
-def fixed_handlers(*args):
-    return {frozenset(('k', 1))}
+def fixed_handlers(h:List[Tuple[Argset, Stream]]) -> Generator:
+    handlers = {}
+    for i in h:
+        handlers[i[0]] = i[1]
+    return lambda a: handlers[a] if a in handlers else None
+
+def positional_and_keyword(terms:List[Name]) -> Generator:
+    def gen(a:Argset) -> GeneratorResult:
+        
+        return {frozenset(('k', 1))}
 
 class Relation:
     arguments:List[Variable]
     
-    def signature(self, b :ArgSet) -> RelationStream:
+    def signature(self, b :ArgSet) -> Stream:
+        print ("sig", b)
         if b not in self.cache:
             self.cache[b] = self.build(b)
         return self.cache[b]
@@ -47,6 +51,27 @@ class Relation:
     def __init__(self):
         self.cache :Dict[ArgSet, Stream] = {}            
 
+class Aggregate(Relation):
+    def signature(self, b :ArgSet) -> Stream:
+        def entry(f: Frame):
+            # demux arguments and flush
+            pass
+        pass
+    def __init__(self):
+        self.cache :Dict[ArgSet, Stream] = {}
+        
+class Simple(Relation):
+    def __init__(self, *handlers):
+        self.handlers = handlers
+    
+    def signature(self, b :ArgSet) -> Stream:
+        def entry(f: Frame):
+            # demux arguments and flush
+            pass
+        return entry
+
+    
+    
 # supporting the implicit union for the moment..maybe more decorator magic
 RelationSet = Dict[str, List[Relation]]
 
@@ -57,3 +82,4 @@ def format_clauses(cs:List[Clause])->str:
         result += "".join(word.ljust(col_width) for word in c)
     return result
             
+

@@ -1,86 +1,68 @@
 from typing import *
 from relation import *
 
-# rule should really be a separate layer than ast translation
-# we originally passed around our own namespace - and decided to use pythons
 Construct = Callable[[ArgSet], List[Clause]]
 
+def union(*args):
+    return args[0].union(*args[1:])
+
+def dunion(*args):
+    result = {}
+    for i in args:
+        print ("dunion args", i)
+        for k in i:
+            result[k]= i[k]
+    return result
+
 class Rule(Relation):
-    # what about heads? metadata?
-    def __init__(self, args, body: List[Clause], scope):
-        # to support multiple bodies - soft intern a relation, then make an exploder
-        # maybe something to uniquify them....like a class relationship? yeah...
-        # instead of just dumping them in a bucket and not being able to talk
-        # about them individually
+    # this is really an insert?
+    def __init__(self, args:ArgSet, body: List[Clause], scope:Dict[Name, Relation]):
         self.body = body
         self.scope = scope
-        self.error = lambda *x :print("errorz", *x)
+        self.args = args
         super().__init__()
 
-    # ok, we dont really need to dynamize this, we've already deferred signature
-    # generation until the query, so we think that it all should be bound
-    #
-    # change this to generate a list of clauses and move rule out
-    def relation_out(self, rel:str, b:ArgSet, next:Construct, args:List[Variable]) -> Stream:
-        if rel not in self.scope:
-            self.error("no such relation", rel);
-        r = self.scope[rel]
-            
-        if len(args) != len(r.arguments):
-            self.error("arity mismatch")
-
-        inbound = {}
-        outbound = {}
-        const = {}
-
-        for term, target in zip(args, r.arguments):
-            print("checko", term, target, is_constant(term))
-            if term in b:
-                inbound[term] = target
-            else:
-                if is_constant(term):
-                    const[target] = term
-                else:
-                    outbound[term] = target
-
-        print("relation down", args, r.arguments, b, "->", inbound, outbound)                    
-        function = r.signature(frozenset(inbound.values()))
-        down = next(b.union(frozenset(outbound.values())))
-
-        
+    def call(self, rel:str, bound:ArgSet, next:Construct, args:Dict[Name, Any]) -> Stream:
+        # outbound is a map from inner names to outer names
+        outbound = {k:v for (k, v) in args.items() if not k in bound}
+        down = next(union(bound, outbound.values()))
+        def out(oframe):
+            print ("oframe", oframe, outbound)
+            down(dunion(oframe["parent"]["locals"],
+                        {v: oframe[k] for (k, v) in outbound.items()}))
         def inh(f:Frame):
-            save = f["__next__"]
-            def outh(outf:Frame):
-                f2 = f.copy()
-                for output in outbound:
-                    f2[output] = outf[outbound[output]]
-                f2["__next__"] = save                    
-                down(f2)
-
-            input_args = const.copy()
-            for input in inbound:
-                input_args[inbound[input]] = f[input]
-            result = function(input_args, outh)
+            print ("inh", f)
+            # handle free relation? fuse scopes?
+            if rel not in self.scope:
+                # not really, i guess pass an error handler
+                print("no such relation", rel.name.id);
+            sig = frozenset({k for k in args.keys() if (args[k] in bound) or is_constant(args[k])})
+            function = self.scope[rel].signature(sig)
+            # function takes next
+            function({"locals":dunion({k:v for (k, v) in args.items() if is_constant(v)},
+                                   {k:f["locals"][args[k]] for (k, v) in args.items() if v in bound}),
+                      "flush":"flush" in f,
+                      "parent":f,
+                      "next":out})
         return inh
         
     def clauses_to_stream(self, body:List[Clause], b:ArgSet, next:Construct) -> Stream:
+        print ("rule body", body)
         i = body.__iter__()
+        # need to collect up all the closure allocations
         def each(b:ArgSet) -> Stream:
             try:
                 statement = i.__next__()
-                print ("clause", b, statement)
                 # didn't augment the binding
-                return self.relation_out(statement[0], b, each, statement[1:])
+                return self.call(statement[0], b, each, statement[1])
             except StopIteration:
                 return next(b)
         return each(b)
-    
-    # how to get the dynamic next to the tail? we're shoving it in the frame. with a stack
-    # to support nesting. not pretty
-    def build(self, b:ArgSet) -> RelationStream:
-        s = self.clauses_to_stream(self.body, b, lambda b: lambda f: f["__next__"](f))
+
+    def build(self, b:ArgSet) -> Stream:
+        s = self.clauses_to_stream(self.body, b, lambda b: lambda f: f["next"](f))
         def head(f, n):
-            f["__next__"] = n 
+            f["next"] = n 
             s(f)
         return head
 

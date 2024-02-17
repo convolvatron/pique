@@ -4,8 +4,6 @@ def grandparent(grandparent, grandchild):
     parent(parent, grandchild)
     parent(grandparent, parent)
     
-
-# parents is a class, not an instance
 parent = Facts(['parent', 'child'], 
                 facts = [
                     ("joe", "nancy"),
